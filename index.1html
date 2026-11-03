@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>درس تشابه المضلعات - الرياضيات للصف الثاني المتوسط</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Cairo Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Expose Firebase tools globally for the app
+        window.firebaseInitialized = false;
+        try {
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'polygon-lesson-default';
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+            
+            if (firebaseConfig) {
+                const app = initializeApp(firebaseConfig);
+                const db = getFirestore(app);
+                const auth = getAuth(app);
+                
+                window.db = db;
+                window.auth = auth;
+                window.appId = appId;
+                
+                const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+                if (token) {
+                    signInWithCustomToken(auth, token).then(() => { window.firebaseInitialized = true; initLiveSession(); }).catch(() => signInAnonymously(auth).then(() => { window.firebaseInitialized = true; initLiveSession(); }));
+                } else {
+                    signInAnonymously(auth).then(() => { window.firebaseInitialized = true; initLiveSession(); });
+                }
+            }
+        } catch (e) {
+            console.log("Firebase init note:", e);
+        }
+    </script>
+    <style>
+        * {
+            font-family: 'Cairo', sans-serif;
+            touch-action: manipulation;
+        }
+        /* Custom Styles for Canvas Drawing */
+        #drawingCanvas {
+            cursor: crosshair;
+        }
+        .laser-mode #drawingCanvas {
+            cursor: none;
+        }
+        /* Gradient & Theme Enhancements */
+        body {
+            background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 50%, #f3e8ff 100%);
+        }
+        .card-glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        .btn-gradient-primary {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+        }
+        .btn-gradient-primary:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%);
+        }
+        /* Fraction formatting */
+        .fraction {
+            display: inline-flex;
+            flex-direction: column;
+            vertical-align: middle;
+            text-align: center;
+            padding: 0 4px;
+        }
+        .fraction .numerator {
+            border-bottom: 2px solid currentColor;
+            padding-bottom: 2px;
+        }
+        .fraction .denominator {
+            padding-top: 2px;
+        }
+        /* Laser pointer pulse animation */
+        @keyframes laser-glow {
+            0% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.4); opacity: 0.6; }
+            100% { transform: scale(1); opacity: 0.9; }
+        }
+        .laser-dot {
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background-color: #ef4444;
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 12px #ef4444, 0 0 20px #dc2626;
+            animation: laser-glow 1s infinite;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col justify-between overflow-x-hidden select-none">
+
+    <!-- Header / Navigation Bar -->
+    <header class="bg-white/90 backdrop-blur-md shadow-sm border-b border-indigo-100 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <!-- Title -->
+            <div class="flex items-center space-x-3 space-x-reverse">
+                <div class="bg-gradient-to-tr from-indigo-600 to-blue-500 text-white p-2.5 rounded-2xl shadow-lg shadow-indigo-200">
+                    <i class="fa-solid fa-shapes text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold bg-gradient-to-r from-indigo-900 via-blue-800 to-indigo-700 bg-clip-text text-transparent leading-tight">تشابه المضلعات</h1>
+                    <p class="text-xs text-indigo-600/80 font-bold">الصف الثاني المتوسط - مادة الرياضيات</p>
+                </div>
+            </div>
+
+            <!-- Interactive Tools Bar -->
+            <div class="flex items-center gap-2 bg-indigo-50/80 p-1.5 rounded-2xl border border-indigo-100 flex-wrap">
+                <!-- Live Students Answers Status Toggle -->
+                <button onclick="openLiveAnswersModal()" class="px-3 py-1.5 rounded-xl font-bold text-sm flex items-center gap-2 transition bg-purple-600 text-white hover:bg-purple-700 shadow-sm relative">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span class="hidden sm:inline">إجابات الطلاب الحية</span>
+                    <span id="liveAnswersCountBadge" class="absolute -top-1.5 -right-1.5 bg-rose-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-black shadow">٠</span>
+                </button>
+
+                <!-- Teams Share / Student Mode Button -->
+                <button onclick="openTeamsModal()" class="px-3 py-1.5 rounded-xl font-bold text-sm flex items-center gap-2 transition bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm">
+                    <i class="fa-solid fa-users-viewfinder"></i>
+                    <span class="hidden sm:inline">رابط مشاركة الطلاب (Teams)</span>
+                </button>
+
+                <!-- Laser Pointer Toggle -->
+                <button id="btnLaser" onclick="toggleLaser()" class="px-3 py-1.5 rounded-xl font-bold text-sm flex items-center gap-2 transition bg-white text-slate-700 hover:bg-slate-100 shadow-sm border border-slate-200">
+                    <i class="fa-solid fa-arrow-pointer text-red-500"></i>
+                    <span class="hidden sm:inline">مؤشر القراءة</span>
+                </button>
+                
+                <!-- Drawing Pen Toggle -->
+                <button id="btnPen" onclick="togglePen()" class="px-3 py-1.5 rounded-xl font-bold text-sm flex items-center gap-2 transition bg-white text-slate-700 hover:bg-slate-100 shadow-sm border border-slate-200">
+                    <i class="fa-solid fa-pen-line text-indigo-600"></i>
+                    <span class="hidden sm:inline">قلم الحل</span>
+                </button>
+
+                <!-- Clear Canvas Button -->
+                <button onclick="clearCanvas()" class="px-3 py-1.5 rounded-xl font-bold text-sm text-slate-600 hover:bg-indigo-100/60 transition" title="مسح السبورة">
+                    <i class="fa-solid fa-eraser"></i>
+                </button>
+            </div>
+
+            <!-- Quiz Progress -->
+            <div class="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100">
+                <span class="text-sm font-bold text-indigo-900">السؤال <span id="currentQNum" class="text-indigo-600 font-black">١</span> من ١٠</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-6xl w-full mx-auto p-4 sm:p-6 flex-grow relative flex flex-col">
+        
+        <!-- Live Answers Summary Banner for Teacher -->
+        <div id="liveAnswerBanner" class="mb-4 bg-gradient-to-r from-purple-900 to-indigo-900 text-white p-4 rounded-2xl shadow-md flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-purple-700/80 p-2 rounded-xl text-purple-200">
+                    <i class="fa-solid fa-satellite-dish fa-beat"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-sm sm:text-base">لوحة تفاعل الطلاب الحية (عبر تيمز)</h3>
+                    <p class="text-xs text-purple-200">الطلاب الذين أجابوا على السؤال الحالي: <span id="answeredCount" class="font-black text-amber-300">٠</span> طالب</p>
+                </div>
+            </div>
+            <button onclick="openLiveAnswersModal()" class="px-4 py-2 bg-white text-purple-900 font-extrabold rounded-xl text-xs sm:text-sm hover:bg-purple-50 transition shadow">
+                عرض تفاصيل إجابات الطلاب
+            </button>
+        </div>
+
+        <!-- Section Title Badge -->
+        <div class="mb-4 text-center sm:text-right">
+            <span id="sectionBadge" class="inline-block px-4 py-1.5 rounded-full text-xs sm:text-sm font-bold bg-gradient-to-r from-indigo-500 to-blue-600 text-white shadow-md shadow-indigo-200">
+                القسم الأول: تحديد المضلعات المتشابهة
+            </span>
+        </div>
+
+        <!-- Question Card Container -->
+        <div id="cardContainer" class="card-glass rounded-3xl shadow-xl border border-indigo-100 p-4 sm:p-8 relative overflow-hidden flex-grow flex flex-col justify-between">
+            
+            <!-- Canvas Overlay for Drawing & Solutions -->
+            <canvas id="drawingCanvas" class="absolute inset-0 z-20 pointer-events-none w-full h-full"></canvas>
+
+            <!-- Laser Dot Container -->
+            <div id="laserDot" class="laser-dot hidden"></div>
+
+            <!-- Question & Graphics Container -->
+            <div class="z-10 relative">
+                <!-- Question Text -->
+                <div class="bg-gradient-to-r from-indigo-50/80 to-blue-50/80 p-4 sm:p-6 rounded-2xl border border-indigo-100 mb-6 shadow-sm">
+                    <h2 id="questionText" class="text-lg sm:text-2xl font-extrabold text-indigo-950 leading-relaxed">
+                        جاري تحميل السؤال...
+                    </h2>
+                </div>
+
+                <!-- Graphic/Diagram Area -->
+                <div class="flex justify-center items-center my-4 min-h-[180px] sm:min-h-[220px] bg-slate-50/70 rounded-2xl border border-dashed border-indigo-200 p-4 relative" id="diagramContainer">
+                    <!-- SVG Drawings Inserted Dynamically -->
+                </div>
+            </div>
+
+            <!-- Options Grid -->
+            <div id="optionsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4 my-4 z-10 relative">
+                <!-- MCQ Options Dynamic Insertion -->
+            </div>
+
+            <!-- Feedback Area (Shows after answering) -->
+            <div id="feedbackContainer" class="hidden mt-6 p-5 rounded-2xl z-10 relative border transition-all duration-300">
+                <div class="flex items-start gap-3">
+                    <div id="feedbackIcon" class="text-2xl mt-1"></div>
+                    <div>
+                        <h3 id="feedbackTitle" class="font-bold text-lg mb-1"></h3>
+                        <div id="feedbackText" class="text-sm sm:text-base leading-relaxed"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Controls -->
+            <div class="flex justify-between items-center mt-8 pt-4 border-t border-slate-100 z-10 relative">
+                <button id="btnPrev" onclick="changeQuestion(-1)" class="px-5 py-2.5 rounded-xl bg-slate-200/80 text-slate-700 font-bold hover:bg-slate-300 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2">
+                    <i class="fa-solid fa-chevron-right"></i>
+                    السابق
+                </button>
+
+                <div class="flex gap-1.5" id="progressDots">
+                    <!-- Dots generated dynamically -->
+                </div>
+
+                <button id="btnNext" onclick="changeQuestion(1)" class="px-5 py-2.5 rounded-xl btn-gradient-primary text-white font-bold hover:opacity-95 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-2 shadow-md">
+                    التالي
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Teams Modal Instructions for Teacher -->
+    <div id="teamsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 text-right">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 class="text-xl font-extrabold text-indigo-950 flex items-center gap-2">
+                    <i class="fa-brands fa-microsoft text-blue-600"></i>
+                    رابط تفاعل الطلاب عبر مايكروسوفت تيمز (Teams)
+                </h3>
+                <button onclick="closeTeamsModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 text-slate-700 text-sm leading-relaxed">
+                <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                    <p class="font-bold text-emerald-900 mb-1"><i class="fa-solid fa-circle-check text-emerald-600 ml-1"></i> ميزة الربط الحي مفعلة:</p>
+                    <p class="text-emerald-800">أرسل الرابط أدناه في <strong>دردشة حصة التيمز (Chat)</strong>. عندما يختار كل طالب إجابته من جهازه، ستظهر إجابته وتحديثاتها لحظياً على شاشتك في زر "إجابات الطلاب الحية"!</p>
+                </div>
+
+                <div>
+                    <p class="font-bold mb-2">رابط الدرس للطلاب:</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="shareUrlInput" readonly class="w-full bg-slate-100 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 select-all" value="" />
+                        <button onclick="copyShareUrl()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs whitespace-nowrap shadow-sm">
+                            نسخ الرابط
+                        </button>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-bold mb-1 text-xs text-slate-600">أدخل اسمك كطالب (إذا كنت تختبر من جهازك):</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="studentNameInput" placeholder="اكتب اسمك الثلاثي..." class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-800 font-bold" onchange="saveStudentName(this.value)" />
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 text-center">
+                <button onclick="closeTeamsModal()" class="px-6 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-sm transition">
+                    إغلاق
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Answers Details Modal -->
+    <div id="liveAnswersModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-3xl max-w-2xl w-full p-6 shadow-2xl border border-slate-100 text-right max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                <h3 class="text-xl font-extrabold text-purple-950 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-pie text-purple-600"></i>
+                    نتائج وإجابات الطلاب الحية (السؤال <span id="modalQNum">١</span>)
+                </h3>
+                <button onclick="closeLiveAnswersModal()" class="text-slate-400 hover:text-slate-700 font-bold text-lg px-2">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="bg-purple-50 p-3 rounded-xl mb-4 border border-purple-100 flex justify-between items-center text-xs sm:text-sm font-bold text-purple-900">
+                <span>إجمالي الطلاب المشاركين: <span id="totalStudentsBadge" class="text-purple-700 font-black">٠</span></span>
+                <span>الإجابة الصحيحة للسؤال: <span id="correctOptionLetterBadge" class="text-emerald-700 font-black">أ</span></span>
+            </div>
+
+            <div class="overflow-y-auto flex-grow space-y-2 pr-1" id="studentsAnswersList">
+                <!-- Dynamic student answers rows -->
+                <div class="text-center py-8 text-slate-400">جاري استقبال إجابات الطلاب الحية...</div>
+            </div>
+
+            <div class="mt-6 pt-3 border-t border-slate-100 flex justify-between items-center">
+                <button onclick="resetCurrentQuestionVotes()" class="px-4 py-2 bg-rose-100 hover:bg-rose-200 text-rose-700 font-bold rounded-xl text-xs transition">
+                    إعادة ضبط إجابات هذا السؤال
+                </button>
+                <button onclick="closeLiveAnswersModal()" class="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-xl text-sm transition shadow">
+                    تم
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-3 text-center text-xs sm:text-sm text-slate-600 font-bold">
+<!-- ... existing class="text-slate-800 ... -->
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Array of Arabic Digits mapping
+        const arabicDigits = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        function toArabicNum(num) {
+            return num.toString().replace(/\d/g, d => arabicDigits[d]);
+        }
+
+        // Student Session Storage ID & Name
+        let studentId = localStorage.getItem('polygon_student_id');
+        if (!studentId) {
+            studentId = 'student_' + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('polygon_student_id', studentId);
+        }
+        let studentName = localStorage.getItem('polygon_student_name') || '';
+
+        // Live Answers State Database listener unsubscribe reference
+        let unsubscribeAnswers = null;
+        let allLiveAnswersData = {};
+
+        function saveStudentName(name) {
+            studentName = name.trim();
+            localStorage.setItem('polygon_student_name', studentName);
+        }
+
+        function initLiveSession() {
+            if (!window.db || !window.firebaseInitialized) return;
+            
+            // Listen to all student responses for this app session in real-time
+            const answersCol = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'student_answers');
+            unsubscribeAnswers = onSnapshot(answersCol, (snapshot) => {
+                allLiveAnswersData = {};
+                snapshot.forEach((docSnap) => {
+                    const data = docSnap.data();
+                    if (data && data.studentId) {
+                        allLiveAnswersData[data.studentId] = data;
+                    }
+                });
+                updateLiveUIStats();
+            }, (error) => {
+                console.log("Snapshot error:", error);
+            });
+        }
+
+        function submitStudentAnswer(qIndex, selectedIdx, isCorrect) {
+            if (!window.db || !window.firebaseInitialized) return;
+            
+            const nameToSave = studentName || ('طالب ' + studentId.substring(studentId.length - 4));
+            const docId = `${window.appId}_${studentId}`;
+            
+            const answerPayload = {
+                studentId: studentId,
+                studentName: nameToSave,
+                questionIndex: qIndex,
+                selectedOption: selectedIdx,
+                isCorrect: isCorrect,
+                timestamp: Date.now()
+            };
+
+            const docRef = doc(window.db, 'artifacts', window.appId, 'public', 'data', 'student_answers', docId);
+            setDoc(docRef, answerPayload, { merge: true }).catch(err => console.log("Save answer error:", err));
+        }
+
+        function updateLiveUIStats() {
+            let countForCurrentQ = 0;
+            Object.values(allLiveAnswersData).forEach(ans => {
+                if (ans.questionIndex === currentIndex) {
+                    countForCurrentQ++;
+                }
+            });
+            document.getElementById('answeredCount').innerText = toArabicNum(countForCurrentQ);
+            document.getElementById('liveAnswersCountBadge').innerText = toArabicNum(countForCurrentQ);
+
+            // If live modal is open, refresh its list
+            const modal = document.getElementById('liveAnswersModal');
+            if (modal && !modal.classList.contains('hidden')) {
+                renderLiveAnswersModalContent();
+            }
+        }
+
+        function openLiveAnswersModal() {
+            document.getElementById('liveAnswersModal').classList.remove('hidden');
+            renderLiveAnswersModalContent();
+        }
+
+        function closeLiveAnswersModal() {
+            document.getElementById('liveAnswersModal').classList.add('hidden');
+        }
+
+        function renderLiveAnswersModalContent() {
+            document.getElementById('modalQNum').innerText = toArabicNum(currentIndex + 1);
+            const q = questions[currentIndex];
+            const arabicOptionLetters = ['أ', 'ب', 'جـ', 'د'];
+            document.getElementById('correctOptionLetterBadge').innerText = arabicOptionLetters[q.correct];
+
+            const listContainer = document.getElementById('studentsAnswersList');
+            listContainer.innerHTML = '';
+
+            let currentQAnswers = [];
+            Object.values(allLiveAnswersData).forEach(ans => {
+                if (ans.questionIndex === currentIndex) {
+                    currentQAnswers.push(ans);
+                }
+            });
+
+            document.getElementById('totalStudentsBadge').innerText = toArabicNum(currentQAnswers.length);
+
+            if (currentQAnswers.length === 0) {
+                listContainer.innerHTML = '<div class="text-center py-8 text-slate-400 font-bold">لم يقم أي طالب بالإجابة على هذا السؤال حتى الآن.</div>';
+                return;
+            }
+
+            currentQAnswers.sort((a, b) => b.timestamp - a.timestamp);
+
+            currentQAnswers.forEach(ans => {
+                const optLetter = arabicOptionLetters[ans.selectedOption];
+                const isCorrect = ans.isCorrect;
+                
+                const row = document.createElement('div');
+                row.className = `p-3 rounded-2xl border flex items-center justify-between gap-3 ${isCorrect ? 'bg-emerald-50/80 border-emerald-200 text-emerald-950' : 'bg-rose-50/80 border-rose-200 text-rose-950'}`;
+                row.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-white shadow-sm ${isCorrect ? 'bg-emerald-600' : 'bg-rose-500'}">
+                            ${optLetter}
+                        </div>
+                        <div>
+                            <p class="font-extrabold text-sm">${ans.studentName}</p>
+                            <p class="text-xs text-slate-500">اختر الخيار (${optLetter}) - ${ans.selectedOption === q.correct ? 'إجابة صحيحة ✓' : 'إجابة خاطئة ✗'}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold ${isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}">
+                            ${isCorrect ? 'صحيح' : 'خطأ'}
+                        </span>
+                    </div>
+                `;
+                listContainer.appendChild(row);
+            });
+        }
+
+        async function resetCurrentQuestionVotes() {
+            if (!window.db || !window.firebaseInitialized) return;
+            try {
+                const answersCol = collection(window.db, 'artifacts', window.appId, 'public', 'data', 'student_answers');
+                const snapshot = await getDocs(answersCol);
+                snapshot.forEach(async (docSnap) => {
+                    const data = docSnap.data();
+                    if (data && data.questionIndex === currentIndex) {
+                        // We can set it to index -1 or clear it by updating
+                        await setDoc(docSnap.ref, { questionIndex: -99 }, { merge: true });
+                    }
+                });
+                updateLiveUIStats();
+                renderLiveAnswersModalContent();
+            } catch (e) {
+                console.log("Reset error:", e);
+            }
+        }
+
+        // --- AUDIO SYNTHESIZER (Web Audio API for Cheering & Try Again Sounds) ---
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        // Sound 1: Clap & Applause sound for correct answer
+        function playCorrectSound() {
+            try {
+                const ctx = getAudioContext();
+                
+                const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0, ctx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.05 + idx * 0.08);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6 + idx * 0.08);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + idx * 0.08);
+                    osc.stop(ctx.currentTime + 0.7 + idx * 0.08);
+                });
+
+                const bufferSize = ctx.sampleRate * 1.2;
+                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                for (let i = 0; i < 28; i++) {
+                    const timeOffset = Math.random() * 1.0;
+                    const whiteNoise = ctx.createBufferSource();
+                    whiteNoise.buffer = buffer;
+
+                    const filter = ctx.createBiquadFilter();
+                    filter.type = 'bandpass';
+                    filter.frequency.value = 1000 + Math.random() * 1200;
+
+                    const gain = ctx.createGain();
+                    gain.gain.setValueAtTime(0.2, ctx.currentTime + timeOffset);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + timeOffset + 0.06);
+
+                    whiteNoise.connect(filter);
+                    filter.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    whiteNoise.start(ctx.currentTime + timeOffset);
+                    whiteNoise.stop(ctx.currentTime + timeOffset + 0.07);
+                }
+            } catch (e) {
+                console.log("Audio play error", e);
+            }
+        }
+
+        // Sound 2: Try Again / Wrong Answer sound
+        function playWrongSound() {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+                
+                const freqs = [330, 261.63]; // E4 to C4
+                freqs.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, now + idx * 0.15);
+
+                    gain.gain.setValueAtTime(0.12, now + idx * 0.15);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.15 + 0.2);
+
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+
+                    osc.start(now + idx * 0.15);
+                    osc.stop(now + idx * 0.15 + 0.22);
+                });
+            } catch (e) {
+                console.log("Audio play error", e);
+            }
+        }
+
+        // --- DATA STRUCTURE (10 Questions divided into 3 Sections) ---
+        const questions = [
+            // SECTION 1: Identifying Similarity (Q1-Q4)
+            {
+                section: "القسم الأول: مفهوم تشابه الأشكال",
+                text: "حدد ما إذا كان الشكلان التاليان متشابهين أم لا، ووضح السبب:",
+                svg: `
+                    <svg viewBox="0 0 500 180" class="w-full max-w-lg h-auto">
+                        <!-- Car 1 (Large) -->
+                        <g transform="translate(40, 20)">
+                            <rect x="10" y="50" width="180" height="40" rx="15" fill="#2563eb"/>
+                            <path d="M 45 50 L 70 15 L 135 15 L 160 50 Z" fill="#1d4ed8"/>
+                            <path d="M 50 46 L 72 20 L 97 20 L 97 46 Z" fill="#93c5fd"/>
+                            <path d="M 103 46 L 103 20 L 128 20 L 152 46 Z" fill="#93c5fd"/>
+                            <circle cx="55" cy="90" r="22" fill="#1e293b"/>
+                            <circle cx="55" cy="90" r="10" fill="#94a3b8"/>
+                            <circle cx="145" cy="90" r="22" fill="#1e293b"/>
+                            <circle cx="145" cy="90" r="10" fill="#94a3b8"/>
+                        </g>
+
+                        <!-- Car 2 (Small) -->
+                        <g transform="translate(300, 45)">
+                            <rect x="7" y="35" width="126" height="28" rx="10" fill="#3b82f6"/>
+                            <path d="M 31 35 L 49 10 L 94 10 L 112 35 Z" fill="#2563eb"/>
+                            <path d="M 35 32 L 50 14 L 68 14 L 68 32 Z" fill="#bfdbfe"/>
+                            <path d="M 72 32 L 72 14 L 90 14 L 106 32 Z" fill="#bfdbfe"/>
+                            <circle cx="38" cy="63" r="15" fill="#1e293b"/>
+                            <circle cx="38" cy="63" r="7" fill="#94a3b8"/>
+                            <circle cx="101" cy="63" r="15" fill="#1e293b"/>
+                            <circle cx="101" cy="63" r="7" fill="#94a3b8"/>
+                        </g>
+                    </svg>
+                `,
+                options: [
+                    "متشابهة لأن لها الحجم نفسه",
+                    "متشابهة لأن لها الشكل نفسه",
+                    "غير متشابهة لأن لها الحجم نفسه",
+                    "غير متشابهة لأن لها الشكل نفسه"
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">إجابة صحيحة!</p>
+                    <p>الشكلان **متشابهان** لأن لهما **الشكل نفسه** وإن اختلفا في الحجم.</p>
+                `
+            },
+            {
+                section: "القسم الأول: هل المضلعات متشابهة؟",
+                text: "حدد ما إذا كان المستطيلان التاليان متشابهين أم لا، ووضح السبب:",
+                svg: `
+                    <svg viewBox="0 0 500 240" class="w-full max-w-lg h-auto">
+                        <rect x="50" y="55" width="160" height="110" fill="#e0f2fe" stroke="#0284c7" stroke-width="3" rx="4"/>
+                        <text x="130" y="32" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٧ سم</text>
+                        <text x="22" y="115" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٦ سم</text>
+                        <text x="130" y="198" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">أ ب جـ د</text>
+                        
+                        <rect x="300" y="75" width="130" height="70" fill="#fef3c7" stroke="#d97706" stroke-width="3" rx="4"/>
+                        <text x="365" y="52" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٤ سم</text>
+                        <text x="270" y="115" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٢ سم</text>
+                        <text x="365" y="180" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">س ص ع ل</text>
+                    </svg>
+                `,
+                options: [
+                    "متشابهان؛ لأن الزوايا المتناظرة متطابقة والأضلاع المتناظرة متناسبة.",
+                    "غير متشابهين؛ لأن نسبة الأضلاع المتناظرة غير متساوية (<span class='fraction'><span class='numerator'>٦</span><span class='denominator'>٢</span></span> ≠ <span class='fraction'><span class='numerator'>٧</span><span class='denominator'>٤</span></span>).",
+                    "متشابهان؛ لأن كلاهما مستطيل زواياه قائمة.",
+                    "غير متشابهين؛ لأن الزوايا المتناظرة غير متطابقة."
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">إجابة صحيحة!</p>
+                    <p>١. الزوايا المتناظرة متطابقة (جميعها قائمة = ٩٠°).</p>
+                    <p>٢. اختبار نسبة الأضلاع المتناظرة: 
+                       <span class="fraction"><span class="numerator">٦</span><span class="denominator">٢</span></span> = ٣  
+                       بينما  
+                       <span class="fraction"><span class="numerator">٧</span><span class="denominator">٤</span></span> = ١٫٧٥.
+                    </p>
+                    <p>بما أن النسب غير متساوية (٣ ≠ ١٫٧٥)، فإن الأضلاع غير متناسبة والمضلعان **غير متشابهين**.</p>
+                `
+            },
+            {
+                section: "القسم الأول: هل المضلعات متشابهة؟",
+                text: "هل المثلثان القائمان الآتيان متشابهان؟",
+                svg: `
+                    <svg viewBox="0 0 500 220" class="w-full max-w-lg h-auto">
+                        <polygon points="50,150 170,150 50,50" fill="#dcfce7" stroke="#15803d" stroke-width="3"/>
+                        <text x="110" y="185" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٨ سم</text>
+                        <text x="22" y="105" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٦ سم</text>
+                        
+                        <polygon points="290,150 410,150 290,100" fill="#fce7f3" stroke="#be185d" stroke-width="3"/>
+                        <text x="350" y="185" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٦ سم</text>
+                        <text x="262" y="130" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٢ سم</text>
+                    </svg>
+                `,
+                options: [
+                    "متشابهان؛ لأن النسب بين الأضلاع متساوية.",
+                    "غير متشابهين؛ لأن نسبة الساقين <span class='fraction'><span class='numerator'>٨</span><span class='denominator'>٦</span></span> ≠ <span class='fraction'><span class='numerator'>٦</span><span class='denominator'>٢</span></span>.",
+                    "متشابهان؛ كلاهما مثلث قائم الزاوية.",
+                    "غير متشابهين؛ لأن الزوايا غير متطابقة."
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">ممتاز!</p>
+                    <p>اختبار تناسب الأضلاع المتناظرة:</p>
+                    <p>الضلع الأول: <span class="fraction"><span class="numerator">٨</span><span class="denominator">٦</span></span> = <span class="fraction"><span class="numerator">٤</span><span class="denominator">٣</span></span></p>
+                    <p>الضلع الثاني: <span class="fraction"><span class="numerator">٦</span><span class="denominator">٢</span></span> = ٣</p>
+                    <p>بما أن <span class="fraction"><span class="numerator">٤</span><span class="denominator">٣</span></span> ≠ ٣ فإن الأضلاع المتناظرة غير متناسبة، وبالتالي المضلعان **غير متشابهين**.</p>
+                `
+            },
+            {
+                section: "القسم الأول: هل المضلعات متشابهة؟",
+                text: "يتشابه مضلعان إذا وفقط إذا كانت زواياهما المتناظرة ........ وأضلاعهما المتناظرة ........",
+                svg: `
+                    <svg viewBox="0 0 500 140" class="w-full max-w-md h-auto">
+                        <g transform="translate(100, 20)">
+                            <polygon points="20,80 50,20 110,20 140,80" fill="#f3e8ff" stroke="#7e22ce" stroke-width="3"/>
+                            <polygon points="180,80 200,40 240,40 260,80" fill="#f3e8ff" stroke="#7e22ce" stroke-width="3"/>
+                        </g>
+                    </svg>
+                `,
+                options: [
+                    "متناسبة ، متطابقة",
+                    "متطابقة ، متناسبة",
+                    "متساوية ، متساوية",
+                    "متوازية ، متطابقة"
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">إجابة صحيحة!</p>
+                    <p>تعريف تشابه المضلعات: يتشابه مضلعان إذا كانت **الزوايا المتناظرة متطابقة** (لها نفس القياس) و**الأضلاع المتناظرة متناسبة** (نسب أطوالها متساوية).</p>
+                `
+            },
+
+            // SECTION 2: Finding Missing Side Length (Q5-Q7)
+            {
+                section: "القسم الثاني: إيجاد طول الضلع الناقص",
+                text: "إذا كان المضلع (ك ل م ن) يشابه المضلع (ع ف ص ق)، فأوجد طول الضلع الناقص ( ك ):",
+                svg: `
+                    <svg viewBox="0 0 500 210" class="w-full max-w-lg h-auto">
+                        <polygon points="40,50 160,50 180,140 20,140" fill="#fefce8" stroke="#ca8a04" stroke-width="3"/>
+                        <text x="100" y="28" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">١٨ سم</text>
+                        <text x="100" y="175" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">ك</text>
+
+                        <polygon points="300,70 380,70 393,130 287,130" fill="#f8fafc" stroke="#475569" stroke-width="3"/>
+                        <text x="340" y="48" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٦ سم</text>
+                        <text x="340" y="162" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٥ سم</text>
+                    </svg>
+                `,
+                options: [
+                    "ك = ١٠ سم",
+                    "ك = ١٢ سم",
+                    "ك = ١٥ سم",
+                    "ك = ٢٠ سم"
+                ],
+                correct: 2,
+                feedback: `
+                    <p class="font-bold text-emerald-700">عمل ممتاز وأحسنت التفكير!</p>
+                    <p>نكون التناسب:</p>
+                    <p><span class="fraction"><span class="numerator">١٨</span><span class="denominator">٦</span></span> = <span class="fraction"><span class="numerator">ك</span><span class="denominator">٥</span></span></p>
+                    <p>بما أن <span class="fraction"><span class="numerator">١٨</span><span class="denominator">٦</span></span> = ٣</p>
+                    <p>إذن: ٣ = <span class="fraction"><span class="numerator">ك</span><span class="denominator">٥</span></span>  ←  ك = ٣ × ٥ = **١٥ سم**</p>
+                `
+            },
+            {
+                section: "القسم الثاني: إيجاد طول الضلع الناقص",
+                text: "المثلث (أ ب جـ) يشابه المثلث (د هـ و). أوجد قيمة المتغير ( ص ):",
+                svg: `
+                    <svg viewBox="0 0 500 210" class="w-full max-w-lg h-auto">
+                        <polygon points="60,140 180,140 60,40" fill="#fff7ed" stroke="#ea580c" stroke-width="3"/>
+                        <text x="120" y="175" font-size="17" font-weight="800" fill="#000000">١٢ سم</text>
+                        <text x="25" y="95" font-size="17" font-weight="800" fill="#000000">ص</text>
+                        <text x="60" y="25" font-size="17" font-weight="800" fill="#000000">أ</text>
+                        <text x="35" y="155" font-size="17" font-weight="800" fill="#000000">ب</text>
+                        <text x="195" y="155" font-size="17" font-weight="800" fill="#000000">جـ</text>
+
+                        <polygon points="310,140 370,140 310,90" fill="#f0fdf4" stroke="#16a34a" stroke-width="3"/>
+                        <text x="340" y="175" font-size="17" font-weight="800" fill="#000000">٤ سم</text>
+                        <text x="278" y="120" font-size="17" font-weight="800" fill="#000000">٣ سم</text>
+                        <text x="310" y="75" font-size="17" font-weight="800" fill="#000000">د</text>
+                        <text x="288" y="155" font-size="17" font-weight="800" fill="#000000">هـ</text>
+                        <text x="382" y="155" font-size="17" font-weight="800" fill="#000000">و</text>
+                    </svg>
+                `,
+                options: [
+                    "ص = ٩ سم",
+                    "ص = ٦ سم",
+                    "ص = ١٥ سم",
+                    "ص = ٧ سم"
+                ],
+                correct: 0,
+                feedback: `
+                    <p class="font-bold text-emerald-700">رائع جداً!</p>
+                    <p>نكتب التناسب بين الأضلاع المتناظرة:</p>
+                    <p><span class="fraction"><span class="numerator">ص</span><span class="denominator">٣</span></span> = <span class="fraction"><span class="numerator">١٢</span><span class="denominator">٤</span></span></p>
+                    <p>بالضرب التبادلي:</p>
+                    <p>٤ × ص = ٣ × ١٢</p>
+                    <p>٤ص = ٣٦  ←  ص = <span class="fraction"><span class="numerator">٣٦</span><span class="denominator">٤</span></span> = **٩ سم**</p>
+                `
+            },
+            {
+                section: "القسم الثاني: إيجاد طول الضلع الناقص",
+                text: "إذا كان الشكلان الآتيان متشابهين، فأوجد قيمة المتغير ( س ):",
+                svg: `
+                    <svg viewBox="0 0 500 210" class="w-full max-w-lg h-auto">
+                        <polygon points="50,140 190,140 150,50 70,50" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+                        <text x="120" y="175" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">١٦ سم</text>
+                        <text x="25" y="100" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">١٠ سم</text>
+
+                        <polygon points="310,140 400,140 380,80 320,80" fill="#faf5ff" stroke="#9333ea" stroke-width="3"/>
+                        <text x="355" y="175" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">س</text>
+                        <text x="288" y="115" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٥ سم</text>
+                    </svg>
+                `,
+                options: [
+                    "س = ٦ سم",
+                    "س = ٨ سم",
+                    "س = ١٠ سم",
+                    "س = ١٢ سم"
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">إجابة صحيحة ومتميزة!</p>
+                    <p>كتابة التناسب باستعمال الأضلاع المتناظرة:</p>
+                    <p><span class="fraction"><span class="numerator">١٠</span><span class="denominator">٥</span></span> = <span class="fraction"><span class="numerator">١٦</span><span class="denominator">س</span></span></p>
+                    <p>باستخدام الضرب التبادلي:</p>
+                    <p>١٠ × س = ٥ × ١٦</p>
+                    <p>١٠س = ٨٠  ←  س = <span class="fraction"><span class="numerator">٨٠</span><span class="denominator">١٠</span></span> = **٨ سم**</p>
+                `
+            },
+
+            // SECTION 3: Scale Factor / Similarity Ratio (Q8-Q10)
+            {
+                section: "القسم الثالث: معامل التشابه (عامل المقياس)",
+                text: "إذا كان المثلث (أ ب جـ) يشابه المثلث (د هـ و), وكان طول الضلع (أ ب) = ٢٠ سم وطول الضلع المناظر له (د هـ) = ٨ سم, فما هو معامل تشابه المثلث (أ ب جـ) إلى المثلث (د هـ و)؟",
+                svg: `
+                    <svg viewBox="0 0 500 200" class="w-full max-w-lg h-auto">
+                        <polygon points="40,140 180,140 60,50" fill="#f0fdf4" stroke="#16a34a" stroke-width="3"/>
+                        <text x="110" y="175" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٢٠ سم</text>
+                        <text x="60" y="28" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">أ ب جـ</text>
+
+                        <polygon points="300,140 375,140 310,90" fill="#eff6ff" stroke="#2563eb" stroke-width="3"/>
+                        <text x="337" y="175" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٨ سم</text>
+                        <text x="310" y="68" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">د هـ و</text>
+                    </svg>
+                `,
+                options: [
+                    "<span class='fraction'><span class='numerator'>٥</span><span class='denominator'>٢</span></span>",
+                    "<span class='fraction'><span class='numerator'>٢</span><span class='denominator'>٥</span></span>",
+                    "<span class='fraction'><span class='numerator'>٤</span><span class='denominator'>٣</span></span>",
+                    "٤"
+                ],
+                correct: 0,
+                feedback: `
+                    <p class="font-bold text-emerald-700">ممتاز جداً!</p>
+                    <p>معامل التشابه = <span class="fraction"><span class="numerator">طول الضلع في المثلث الأول (أ ب)</span><span class="denominator">طول الضلع المناظر في المثلث الثاني (د هـ)</span></span></p>
+                    <p>معامل التشابه = <span class="fraction"><span class="numerator">٢٠</span><span class="denominator">٨</span></span></p>
+                    <p>بتبسيط الكسر بقسمة البسط والمقام على ٤:</p>
+                    <p>= <span class="fraction"><span class="numerator">٥</span><span class="denominator">٢</span></span></p>
+                `
+            },
+            {
+                section: "القسم الثالث: معامل التشابه (عامل المقياس)",
+                text: "مربعان طول ضلع الأول ٨ سم وطول ضلع الثاني ١٢ سم. ما معامل تشابه المربع الأول إلى المربع الثاني؟",
+                svg: `
+                    <svg viewBox="0 0 500 190" class="w-full max-w-lg h-auto">
+                        <rect x="70" y="40" width="80" height="80" fill="#ecfdf5" stroke="#10b981" stroke-width="3" rx="4"/>
+                        <text x="110" y="152" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٨ سم</text>
+
+                        <rect x="280" y="20" width="120" height="120" fill="#fef2f2" stroke="#ef4444" stroke-width="3" rx="4"/>
+                        <text x="340" y="172" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">١٢ سم</text>
+                    </svg>
+                `,
+                options: [
+                    "<span class='fraction'><span class='numerator'>٣</span><span class='denominator'>٢</span></span>",
+                    "<span class='fraction'><span class='numerator'>٢</span><span class='denominator'>٣</span></span>",
+                    "<span class='fraction'><span class='numerator'>٤</span><span class='denominator'>٥</span></span>",
+                    "٢"
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">إجابة صحيحة!</p>
+                    <p>معامل التشابه = <span class="fraction"><span class="numerator">٨</span><span class="denominator">١٢</span></span></p>
+                    <p>بتبسيط الكسر (بقسمة البسط والمقام على ٤):</p>
+                    <p>= <span class="fraction"><span class="numerator">٢</span><span class="denominator">٣</span></span></p>
+                `
+            },
+            {
+                section: "القسم الثالث: معامل التشابه (عامل المقياس)",
+                text: "إذا كان المثلث (أ ب جـ) يشابه المثلث (س ص ع)، أوجد معامل تشابه المثلث (أ ب جـ) إلى المثلث (س ص ع):",
+                svg: `
+                    <svg viewBox="0 0 500 200" class="w-full max-w-lg h-auto">
+                        <polygon points="50,140 170,140 110,40" fill="#e0f2fe" stroke="#0284c7" stroke-width="3"/>
+                        <text x="110" y="172" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">١٥ سم</text>
+                        <text x="110" y="25" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">أ ب جـ</text>
+
+                        <polygon points="300,140 380,140 340,73" fill="#fef3c7" stroke="#d97706" stroke-width="3"/>
+                        <text x="340" y="172" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">٥ سم</text>
+                        <text x="340" y="55" text-anchor="middle" font-size="17" font-weight="800" fill="#000000">س ص ع</text>
+                    </svg>
+                `,
+                options: [
+                    "<span class='fraction'><span class='numerator'>١</span><span class='denominator'>٣</span></span>",
+                    "٣",
+                    "<span class='fraction'><span class='numerator'>٣</span><span class='denominator'>٢</span></span>",
+                    "٥"
+                ],
+                correct: 1,
+                feedback: `
+                    <p class="font-bold text-emerald-700">رائع!</p>
+                    <p>معامل التشابه = <span class="fraction"><span class="numerator">طول ضلع المثلث الأول (أ ب جـ)</span><span class="denominator">طول الضلع المناظر في المثلث الثاني (س ص ع)</span></span></p>
+                    <p>معامل التشابه = <span class="fraction"><span class="numerator">١٥</span><span class="denominator">٥</span></span> = **٣**</p>
+                `
+            }
+        ];
+
+        // --- STATE VARIABLES ---
+        let currentIndex = 0;
+        let isLaserActive = false;
+        let isPenActive = false;
+        let isDrawing = false;
+        let canvas, ctx;
+
+        // --- INITIALIZATION ---
+        window.onload = function() {
+            canvas = document.getElementById('drawingCanvas');
+            ctx = canvas.getContext('2d');
+            
+            setTimeout(resizeCanvas, 100);
+            window.addEventListener('resize', resizeCanvas);
+
+            setupDrawingEvents();
+            setupLaserEvents();
+            createProgressDots();
+            renderQuestion();
+
+            // Set share URL input value
+            document.getElementById('shareUrlInput').value = window.location.href;
+        };
+
+        function resizeCanvas() {
+            const container = document.getElementById('cardContainer');
+            if (!container || !canvas) return;
+            const rect = container.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+
+        // --- TEAMS MODAL FUNCTIONS ---
+        function openTeamsModal() {
+            document.getElementById('teamsModal').classList.remove('hidden');
+        }
+
+        function closeTeamsModal() {
+            document.getElementById('teamsModal').classList.add('hidden');
+        }
+
+        function copyShareUrl() {
+            const input = document.getElementById('shareUrlInput');
+            input.select();
+            document.execCommand('copy');
+            alert('تم نسخ رابط الدرس بنجاح! يمكنك لصقه الآن في محادثة مايكروسوفت تيمز ليتمكن الطلاب من فتحه والإجابة من أجهزتهم.');
+        }
+
+        // --- RENDER QUESTION ---
+        function renderQuestion() {
+            clearCanvas();
+            const q = questions[currentIndex];
+
+            document.getElementById('currentQNum').innerText = toArabicNum(currentIndex + 1);
+            document.getElementById('sectionBadge').innerText = q.section;
+
+            document.getElementById('questionText').innerHTML = q.text;
+            document.getElementById('diagramContainer').innerHTML = q.svg;
+
+            const optionsGrid = document.getElementById('optionsGrid');
+            optionsGrid.innerHTML = '';
+
+            const arabicOptionLetters = ['أ', 'ب', 'جـ', 'د'];
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `option-btn p-4 rounded-2xl border-2 text-right font-bold text-base sm:text-lg transition-all duration-200 flex items-center justify-between bg-slate-50 border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-300 shadow-sm`;
+                btn.onclick = () => selectOption(idx);
+                btn.innerHTML = `
+                    <span>${opt}</span>
+                    <span class="w-7 h-7 rounded-full border border-slate-300 flex items-center justify-center text-sm text-slate-500 font-bold bg-white">${arabicOptionLetters[idx]}</span>
+                `;
+                optionsGrid.appendChild(btn);
+            });
+
+            const fb = document.getElementById('feedbackContainer');
+            fb.className = 'hidden mt-6 p-5 rounded-2xl z-10 relative border transition-all duration-300';
+
+            document.getElementById('btnPrev').disabled = (currentIndex === 0);
+            document.getElementById('btnNext').disabled = (currentIndex === questions.length - 1);
+
+            updateProgressDots();
+            setTimeout(resizeCanvas, 50);
+        }
+
+        // --- OPTION SELECTION & FEEDBACK ---
+        function selectOption(selectedIndex) {
+            const q = questions[currentIndex];
+            const isCorrect = (selectedIndex === q.correct);
+
+            // Submit to Firebase Live database for Teacher Screen
+            submitStudentAnswer(currentIndex, selectedIndex, isCorrect);
+
+            const optionsBtns = document.querySelectorAll('.option-btn');
+            const fbContainer = document.getElementById('feedbackContainer');
+            const fbIcon = document.getElementById('feedbackIcon');
+            const fbTitle = document.getElementById('feedbackTitle');
+            const fbText = document.getElementById('feedbackText');
+
+            optionsBtns.forEach((btn, idx) => {
+                btn.disabled = true;
+                if (idx === q.correct) {
+                    btn.classList.remove('bg-slate-50', 'border-slate-200');
+                    btn.classList.add('bg-emerald-100', 'border-emerald-500', 'text-emerald-950', 'shadow-md');
+                } else if (idx === selectedIndex && selectedIndex !== q.correct) {
+                    btn.classList.remove('bg-slate-50', 'border-slate-200');
+                    btn.classList.add('bg-rose-100', 'border-rose-500', 'text-rose-950');
+                }
+            });
+
+            fbContainer.classList.remove('hidden');
+            if (isCorrect) {
+                playCorrectSound();
+                fbContainer.className = 'mt-6 p-5 rounded-2xl z-10 relative border bg-emerald-50/90 border-emerald-300 text-emerald-950 shadow-md';
+                fbIcon.innerHTML = '<i class="fa-solid fa-circle-check text-emerald-600"></i>';
+                fbTitle.innerText = 'أحسنت! إجابة صحيحة 👏🎉';
+            } else {
+                playWrongSound();
+                fbContainer.className = 'mt-6 p-5 rounded-2xl z-10 relative border bg-rose-50/90 border-rose-300 text-rose-950 shadow-md';
+                fbIcon.innerHTML = '<i class="fa-solid fa-circle-xmark text-rose-600"></i>';
+                fbTitle.innerText = 'إجابة غير صحيحة، حاول مجدداً وركز في الشرح الآتي:';
+            }
+
+            fbText.innerHTML = q.feedback;
+            setTimeout(resizeCanvas, 50);
+        }
+
+        // --- NAVIGATION CONTROLS ---
+        function changeQuestion(dir) {
+            if (currentIndex + dir >= 0 && currentIndex + dir < questions.length) {
+                currentIndex += dir;
+                renderQuestion();
+            }
+        }
+
+        function createProgressDots() {
+            const container = document.getElementById('progressDots');
+            container.innerHTML = '';
+            questions.forEach((_, idx) => {
+                const dot = document.createElement('div');
+                dot.className = `w-3 h-3 rounded-full transition-all cursor-pointer ${idx === 0 ? 'bg-blue-600 w-6' : 'bg-slate-300'}`;
+                dot.onclick = () => {
+                    currentIndex = idx;
+                    renderQuestion();
+                };
+                container.appendChild(dot);
+            });
+        }
+
+        function updateProgressDots() {
+            const dots = document.getElementById('progressDots').children;
+            Array.from(dots).forEach((dot, idx) => {
+                if (idx === currentIndex) {
+                    dot.className = 'w-6 h-3 rounded-full bg-blue-600 transition-all';
+                } else {
+                    dot.className = 'w-3 h-3 rounded-full bg-slate-300 transition-all';
+                }
+            });
+        }
+
+        // --- INTERACTIVE TOOLS (PEN & LASER) ---
+        function toggleLaser() {
+            isLaserActive = !isLaserActive;
+            if (isLaserActive && isPenActive) togglePen();
+
+            const btn = document.getElementById('btnLaser');
+            const laserDot = document.getElementById('laserDot');
+
+            if (isLaserActive) {
+                btn.classList.add('bg-red-500', 'text-white');
+                btn.classList.remove('bg-white', 'text-slate-700');
+                document.body.classList.add('laser-mode');
+            } else {
+                btn.classList.remove('bg-red-500', 'text-white');
+                btn.classList.add('bg-white', 'text-slate-700');
+                document.body.classList.remove('laser-mode');
+                laserDot.classList.add('hidden');
+            }
+        }
+
+        function togglePen() {
+            isPenActive = !isPenActive;
+            if (isPenActive && isLaserActive) toggleLaser();
+
+            const btn = document.getElementById('btnPen');
+            if (isPenActive) {
+                btn.classList.add('bg-blue-600', 'text-white');
+                btn.classList.remove('bg-white', 'text-slate-700');
+                canvas.style.pointerEvents = 'auto';
+            } else {
+                btn.classList.remove('bg-blue-600', 'text-white');
+                btn.classList.add('bg-white', 'text-slate-700');
+                canvas.style.pointerEvents = 'none';
+            }
+        }
+
+        function clearCanvas() {
+            if (ctx && canvas) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function setupDrawingEvents() {
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - rect.left,
+                    y: clientY - rect.top
+                };
+            };
+
+            const startDrawing = (e) => {
+                if (!isPenActive) return;
+                isDrawing = true;
+                const pos = getPos(e);
+                ctx.beginPath();
+                ctx.moveTo(pos.x, pos.y);
+                ctx.strokeStyle = '#2563eb';
+                ctx.lineWidth = 3.5;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+            };
+
+            const draw = (e) => {
+                if (!isDrawing || !isPenActive) return;
+                const pos = getPos(e);
+                ctx.lineTo(pos.x, pos.y);
+                ctx.stroke();
+            };
+
+            const stopDrawing = () => {
+                isDrawing = false;
+            };
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+
+            canvas.addEventListener('touchstart', (e) => {
+                if (isPenActive) e.preventDefault();
+                startDrawing(e);
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                if (isPenActive) e.preventDefault();
+                draw(e);
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        function setupLaserEvents() {
+            const laserDot = document.getElementById('laserDot');
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isLaserActive) return;
+                laserDot.classList.remove('hidden');
+                laserDot.style.left = `${e.clientX}px`;
+                laserDot.style.top = `${e.clientY}px`;
+            });
+
+            document.addEventListener('touchmove', (e) => {
+                if (!isLaserActive) return;
+                laserDot.classList.remove('hidden');
+                laserDot.style.left = `${e.touches[0].clientX}px`;
+                laserDot.style.top = `${e.touches[0].clientY}px`;
+            });
+        }
+    </script>
+</body>
+</html>
